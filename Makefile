@@ -20,7 +20,7 @@ ifeq ($(GCC_VER_49),1)
 EXTRA_CFLAGS += -Wno-date-time	# Fix compile error && warning on gcc 4.9 and later
 endif
 
-EXTRA_CFLAGS += -I$(srctree)/$(src)/include
+EXTRA_CFLAGS += -I$(src)/include
 
 EXTRA_LDFLAGS += --strip-debug
 
@@ -150,7 +150,7 @@ CONFIG_SECURE_DMA = n
 CONFIG_SECURE_DMA_MEM_ADDR = 0
 CONFIG_SECURE_DMA_MEM_SIZE = 3686400
 ###################### Platform Related #######################
-CONFIG_PLATFORM_I386_PC = y
+CONFIG_PLATFORM_I386_PC = n
 CONFIG_PLATFORM_ANDROID_X86 = n
 CONFIG_PLATFORM_ANDROID_INTEL_X86 = n
 CONFIG_PLATFORM_JB_X86 = n
@@ -178,7 +178,7 @@ CONFIG_PLATFORM_ARM_RK3066 = n
 CONFIG_PLATFORM_ARM_RK3188 = n
 CONFIG_PLATFORM_ARM_URBETTER = n
 CONFIG_PLATFORM_ARM_TI_PANDA = n
-CONFIG_PLATFORM_MIPS_JZ4760 = n
+CONFIG_PLATFORM_MIPS_JZ4760 = y
 CONFIG_PLATFORM_DMP_PHILIPS = n
 CONFIG_PLATFORM_MSTAR_TITANIA12 = n
 CONFIG_PLATFORM_MSTAR = n
@@ -286,10 +286,10 @@ _HAL_INTFS_FILES :=	hal/hal_intf.o \
 			hal/led/hal_$(HCI_NAME)_led.o
 
 
-EXTRA_CFLAGS += -I$(srctree)/$(src)/platform
+EXTRA_CFLAGS += -I$(src)/platform
 _PLATFORM_FILES := platform/platform_ops.o
 
-EXTRA_CFLAGS += -I$(srctree)/$(src)/hal/btc  -I$(srctree)/$(src)/hal/phydm
+EXTRA_CFLAGS += -I$(src)/hal/btc  -I$(src)/hal/phydm
 
 ########### HAL_RTL8188E #################################
 ifeq ($(CONFIG_RTL8188E), y)
@@ -2503,7 +2503,7 @@ ifeq ($(CONFIG_SDIO_HCI), y)
 rtk_core += core/rtw_sdio.o
 endif
 
-EXTRA_CFLAGS += -I$(srctree)/$(src)/core/crypto
+EXTRA_CFLAGS += -I$(src)/core/crypto
 rtk_core += \
 		core/crypto/aes-internal.o \
 		core/crypto/aes-internal-enc.o \
