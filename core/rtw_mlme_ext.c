@@ -8475,9 +8475,11 @@ void _issue_assocreq(_adapter *padapter, u8 is_reassoc)
 	u16	cap;
 #endif
 
+#ifdef CONFIG_P2P
 	p2pie = (u8 *)rtw_zmalloc(sizeof(u8) * 255);
 	if (!p2pie)
 		return;
+#endif /* CONFIG_P2P */
 	if (adapter_is_tx_blocked_by_ch_waiting(padapter))
 		goto exit;
 
@@ -8936,8 +8938,10 @@ exit:
 	#endif
 	} else
 		rtw_buf_free(&pmlmepriv->assoc_req, &pmlmepriv->assoc_req_len);
+#ifdef CONFIG_P2P
 	if (p2pie)
 		rtw_mfree(p2pie, 255);
+#endif /* CONFIG_P2P */
 	return;
 }
 
