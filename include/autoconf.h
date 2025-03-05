@@ -94,9 +94,6 @@
 	#endif
 #endif /* CONFIG_CONCURRENT_MODE */
 
-#define CONFIG_LAYER2_ROAMING
-#define CONFIG_LAYER2_ROAMING_RESUME
-
 /*
  * Hareware/Firmware Related Config
  */
@@ -184,8 +181,11 @@
 
 #ifdef CONFIG_POWER_SAVING
 	#define CONFIG_IPS
-	#define CONFIG_LPS
+	#ifdef CONFIG_IPS
+		/* #define CONFIG_FWLPS_IN_IPS */
+	#endif /* CONFIG_IPS */
 
+	#define CONFIG_LPS
 	#if defined(CONFIG_LPS) && (defined(CONFIG_GSPI_HCI) || defined(CONFIG_SDIO_HCI))
 		#define CONFIG_LPS_LCLK
 	#endif

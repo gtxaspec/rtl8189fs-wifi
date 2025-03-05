@@ -3183,6 +3183,9 @@ void init_hal_spec_8188f(_adapter *adapter)
 	hal_spec->macid_cap = MACID_DROP_INDIRECT;
 	hal_spec->macid_txrpt = 0x8100;
 	hal_spec->macid_txrpt_pgsz = 16;
+#ifdef CONFIG_USB_HCI
+	hal_spec->mac_off_access_limit_in_low_clock = _TRUE;
+#endif /* CONFIG_USB_HCI */
 
 	hal_spec->rfpath_num_2g = 1;
 	hal_spec->rfpath_num_5g = 0;
@@ -3679,7 +3682,6 @@ Hal_InitPGData(
 		} else {
 			/* Read EFUSE real map to shadow. */
 			EFUSE_ShadowMapUpdate(padapter, EFUSE_WIFI, _FALSE);
-			_rtw_memcpy((void *)PROMContent, (void *)pHalData->efuse_eeprom_data, HWSET_MAX_SIZE_8188F);
 		}
 	} else {
 		/*autoload fail */
@@ -3687,7 +3689,6 @@ Hal_InitPGData(
 		/*update to default value 0xFF */
 		if (_FALSE == pHalData->EepromOrEfuse)
 			EFUSE_ShadowMapUpdate(padapter, EFUSE_WIFI, _FALSE);
-		_rtw_memcpy((void *)PROMContent, (void *)pHalData->efuse_eeprom_data, HWSET_MAX_SIZE_8188F);
 	}
 
 #ifdef CONFIG_EFUSE_CONFIG_FILE
@@ -3776,12 +3777,11 @@ Hal_EfuseParseChnlPlan_8188F(
 		BOOLEAN			AutoLoadFail
 )
 {
-	hal_com_config_channel_plan(
+	hal_com_parse_channel_plan(
 		padapter
 		, hwinfo ? &hwinfo[EEPROM_COUNTRY_CODE_8188F] : NULL
 		, hwinfo ? hwinfo[EEPROM_ChannelPlan_8188F] : 0xFF
-		, padapter->registrypriv.alpha2
-		, padapter->registrypriv.channel_plan
+		, RTW_CHPLAN_6G_NULL
 		, AutoLoadFail
 	);
 }
@@ -5036,11 +5036,7 @@ u8 SetHwReg8188F(PADAPTER padapter, u8 variable, u8 *val)
 	}
 	break;
 #endif
-#if defined(CONFIG_TDLS) && defined(CONFIG_TDLS_CH_SW)
-	case HW_VAR_TDLS_BCN_EARLY_C2H_RPT:
-		rtl8188f_set_BcnEarly_C2H_Rpt_cmd(padapter, *val);
-		break;
-#endif
+
 	default:
 		ret = SetHwReg(padapter, variable, val);
 		break;

@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2019 Realtek Corporation.
+ * Copyright(c) 2007 - 2022 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -29,6 +29,14 @@
 #ifdef CONFIG_RTL8822C
 #include <rtl8822c_hal.h>
 #endif /* CONFIG_RTL8822C */
+
+#ifdef CONFIG_RTL8723F
+#include <rtl8723f_hal.h>	/* rtl8723fs_set_hal_ops() */
+#endif /* CONFIG_RTL8723F */
+
+#ifdef CONFIG_RTL8822E
+#include <rtl8822e_hal.h>
+#endif /* CONFIG_RTL8822E */
 
 #ifdef CONFIG_PLATFORM_INTEL_BYT
 #ifdef CONFIG_ACPI
@@ -89,11 +97,22 @@ static const struct sdio_device_id sdio_ids[] = {
 #ifdef CONFIG_RTL8821C
 	{SDIO_DEVICE(0x024C, 0xB821), .driver_data = RTL8821C},
 	{SDIO_DEVICE(0x024C, 0xC821), .driver_data = RTL8821C},
+	{SDIO_DEVICE(0x024C, 0x8733), .driver_data = RTL8821C}, /* 8733AS */
+	{SDIO_DEVICE(0x024C, 0xC80C), .driver_data = RTL8821C}, /* 8821CSH-VQ */
 #endif
 
 #ifdef CONFIG_RTL8822C
-	{SDIO_DEVICE(0x024c, 0xC822), .class = SDIO_CLASS_WLAN, .driver_data = RTL8822C},
-	{SDIO_DEVICE(0x024c, 0xD821), .class = SDIO_CLASS_WLAN, .driver_data = RTL8822C}, /* 8821DS */
+	{.vendor = 0x024c, .device = 0xC822, .class = SDIO_CLASS_WLAN, .driver_data = RTL8822C},
+	{.vendor = 0x024c, .device = 0xD821, .class = SDIO_CLASS_WLAN, .driver_data = RTL8822C}, /* 8821DS */
+#endif
+
+#ifdef CONFIG_RTL8723F
+	{.vendor = 0x024c, .device = 0xB733, .class = SDIO_CLASS_WLAN, .driver_data = RTL8723F}, /* SDIO+UART */
+	{.vendor = 0x024c, .device = 0xB73A, .class = SDIO_CLASS_WLAN, .driver_data = RTL8723F}, /* SDIO multi */
+#endif
+
+#ifdef CONFIG_RTL8822E
+	{.vendor = 0x024c, .device = 0xA822, .class = SDIO_CLASS_WLAN, .driver_data = RTL8822E},
 #endif
 
 #if defined(RTW_ENABLE_WIFI_CONTROL_FUNC) /* temporarily add this to accept all sdio wlan id */
@@ -282,6 +301,42 @@ static void gpio_hostwakeup_free_irq(PADAPTER padapter)
 }
 #endif
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+/*
+ * mmc_blksz_for_byte_mode() & mmc_card_broken_byte_mode_512() has been moved
+ * to drivers/mmc/core/card.h from include/linux/mmc/card.h since kernel v4.11.
+ */
+static inline int mmc_blksz_for_byte_mode(const struct mmc_card *c)
+{
+	return c->quirks & MMC_QUIRK_BLKSZ_FOR_BYTE_MODE;
+}
+
+static inline int mmc_card_broken_byte_mode_512(const struct mmc_card *c)
+{
+	return c->quirks & MMC_QUIRK_BROKEN_BYTE_MODE_512;
+}
+#endif /* kernel >= v4.11 */
+
+/*
+ * Calculate the maximum byte mode transfer size
+ */
+static inline unsigned int sdio_max_byte_size(struct sdio_func *func)
+{
+	unsigned mval = func->card->host->max_blk_size;
+
+	if (mmc_blksz_for_byte_mode(func->card))
+		mval = min(mval, func->cur_blksize);
+	else
+		mval = min(mval, func->max_blksize);
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 3, 0)
+	if (mmc_card_broken_byte_mode_512(func->card))
+		return min(mval, 511u);
+#endif /* kernel v3.3 */
+
+	return min(mval, 512u); /* maximum size for byte mode */
+}
+
 void dump_sdio_card_info(void *sel, struct dvobj_priv *dvobj)
 {
 	PSDIO_DATA psdio_data = &dvobj->intf_data;
@@ -357,6 +412,8 @@ void dump_sdio_card_info(void *sel, struct dvobj_priv *dvobj)
 			, card->sdio_func[i]->num, card->sdio_func[i]
 			, psdio_data->func == card->sdio_func[i] ? " (*)" : "");
 	}
+
+	RTW_PRINT_SEL(sel, "  max_byte_size: %u\n", psdio_data->max_byte_size);
 
 	RTW_PRINT_SEL(sel, "================\n");
 }
@@ -510,6 +567,8 @@ u32 sdio_init(struct dvobj_priv *dvobj)
 		psdio_data->sd3_bus_mode = _TRUE;
 #endif
 
+	psdio_data->max_byte_size = sdio_max_byte_size(func);
+
 #ifdef DBG_SDIO
 	sdio_dbg_init(dvobj);
 #endif /* DBG_SDIO */
@@ -643,6 +702,20 @@ static void rtw_decide_chip_type_by_device_id(struct dvobj_priv *dvobj, const st
 	}
 #endif
 
+#if defined(CONFIG_RTL8723F)
+	if (dvobj->chip_type == RTL8723F) {
+		dvobj->HardwareType = HARDWARE_TYPE_RTL8723FS;
+		RTW_INFO("CHIP TYPE: RTL8723F\n");
+	}
+#endif
+
+#if defined(CONFIG_RTL8822E)
+	if (dvobj->chip_type == RTL8822E) {
+		dvobj->HardwareType = HARDWARE_TYPE_RTL8822ES;
+		RTW_INFO("CHIP TYPE: RTL8822E\n");
+	}
+#endif
+
 }
 
 static struct dvobj_priv *sdio_dvobj_init(struct sdio_func *func, const struct sdio_device_id  *pdid)
@@ -765,6 +838,16 @@ u8 rtw_set_hal_ops(PADAPTER padapter)
 		rtl8822cs_set_hal_ops(padapter);
 #endif
 
+#if defined(CONFIG_RTL8723F)
+	if (rtw_get_chip_type(padapter) == RTL8723F)
+		rtl8723fs_set_hal_ops(padapter);
+#endif
+
+#if defined(CONFIG_RTL8822E)
+	if (rtw_get_chip_type(padapter) == RTL8822E)
+		rtl8822es_set_hal_ops(padapter);
+#endif
+
 	if (rtw_hal_ops_check(padapter) == _FAIL)
 		return _FAIL;
 
@@ -839,6 +922,7 @@ _adapter *rtw_sdio_primary_adapter_init(struct dvobj_priv *dvobj)
 #else
 	padapter->hw_port = HW_PORT0;
 #endif
+	padapter->adapter_link.adapter = padapter;
 
 	/* 3 3. init driver special setting, interface, OS and hardware relative */
 
@@ -1081,6 +1165,7 @@ static int rtw_drv_init(
 
 
 	status = _SUCCESS;
+	goto exit;
 
 #if (CONFIG_RTW_SDIO_RELEASE_IRQ <= 1)
 os_ndevs_deinit:
@@ -1169,10 +1254,12 @@ static void rtw_dev_remove(struct sdio_func *func)
 #ifdef CONFIG_SDIO_HOOK_DEV_SHUTDOWN
 static void rtw_dev_shutdown(struct device *dev)
 {
-	struct sdio_func *func = dev_to_sdio_func(dev);
+	struct sdio_func *func;
 
-	if (func == NULL)
+	if (dev == NULL)
 		return;
+
+	func = dev_to_sdio_func(dev);
 
 	RTW_INFO("==> %s !\n", __func__);
 
@@ -1187,8 +1274,8 @@ extern int pm_netdev_close(struct net_device *pnetdev, u8 bnormal);
 
 static int rtw_sdio_suspend(struct device *dev)
 {
-	struct sdio_func *func = dev_to_sdio_func(dev);
-	struct dvobj_priv *psdpriv;
+	struct sdio_func *func = NULL;
+	struct dvobj_priv *psdpriv = NULL;
 	struct pwrctrl_priv *pwrpriv = NULL;
 	_adapter *padapter = NULL;
 	struct debug_priv *pdbgpriv = NULL;
@@ -1200,8 +1287,9 @@ static int rtw_sdio_suspend(struct device *dev)
 #endif
 
 	if (dev == NULL)
-		goto exit;
+		return ret;
 
+	func = dev_to_sdio_func(dev);
 	psdpriv = sdio_get_drvdata(func);
 	if (psdpriv == NULL)
 		goto exit;
@@ -1222,6 +1310,7 @@ static int rtw_sdio_suspend(struct device *dev)
 
 	ret = rtw_suspend_common(padapter);
 
+exit:
 #ifdef CONFIG_RTW_SDIO_PM_KEEP_POWER
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 34))
 	/* Android 4.0 don't support WIFI close power */
@@ -1242,7 +1331,7 @@ static int rtw_sdio_suspend(struct device *dev)
 	}
 #endif
 #endif
-exit:
+
 	return ret;
 }
 int rtw_resume_process(_adapter *padapter)
@@ -1328,6 +1417,9 @@ static int __init rtw_drv_entry(void)
 	rtw_suspend_lock_init();
 	rtw_drv_proc_init();
 	rtw_nlrtw_init();
+#ifdef CONFIG_PLATFORM_CMAP_INTFS
+	cmap_intfs_init();
+#endif
 	rtw_ndev_notifier_register();
 	rtw_inetaddr_notifier_register();
 
@@ -1337,6 +1429,9 @@ static int __init rtw_drv_entry(void)
 		rtw_suspend_lock_uninit();
 		rtw_drv_proc_deinit();
 		rtw_nlrtw_deinit();
+#ifdef CONFIG_PLATFORM_CMAP_INTFS
+		cmap_intfs_deinit();
+#endif
 		rtw_ndev_notifier_unregister();
 		rtw_inetaddr_notifier_unregister();
 		RTW_INFO("%s: register driver failed!!(%d)\n", __FUNCTION__, ret);
@@ -1368,6 +1463,9 @@ static void __exit rtw_drv_halt(void)
 	rtw_suspend_lock_uninit();
 	rtw_drv_proc_deinit();
 	rtw_nlrtw_deinit();
+#ifdef CONFIG_PLATFORM_CMAP_INTFS
+	cmap_intfs_deinit();
+#endif
 	rtw_ndev_notifier_unregister();
 	rtw_inetaddr_notifier_unregister();
 
@@ -1393,4 +1491,3 @@ int rtw_sdio_set_power(int on)
 
 module_init(rtw_drv_entry);
 module_exit(rtw_drv_halt);
-MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);

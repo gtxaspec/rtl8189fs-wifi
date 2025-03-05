@@ -329,6 +329,17 @@ int unregister_net_gpio_init(void)
 
 #else
 
+/************************************************/
+/*          ingenic wlan setting                */
+/************************************************/
+
+extern int ingenic_sdio_wlan_power_onoff(int onoff, int flag);
+#define RESET  0
+#define NORMAL 1
+
+static int poweroff_num = 0;
+static int poweron_num = 0;
+
 int rtw_wifi_gpio_init(void)
 {
 	return 0;
@@ -336,5 +347,32 @@ int rtw_wifi_gpio_init(void)
 
 void rtw_wifi_gpio_wlan_ctrl(int onoff)
 {
+    printk("%s: %d, onoff = %x\n", __func__, __LINE__, onoff);
+	switch (onoff) {
+	case 0:
+		if(poweroff_num){
+			printk(("=========== WLAN placed in RESET OFF========\n"));
+			ingenic_sdio_wlan_power_onoff(onoff, RESET);
+		}else{
+			printk(("=========== WLAN placed in NOMAL OFF ========\n"));
+			poweroff_num = 1;
+			ingenic_sdio_wlan_power_onoff(onoff, NORMAL);
+		}
+		mdelay(100);
+		break;
+	case 1:
+		if(poweron_num){
+			printk(("=========== WLAN placed in RESET ON  ========\n"));
+			ingenic_sdio_wlan_power_onoff(onoff, RESET);
+		}else{
+			printk(("=========== WLAN placed in NOMAL ON========\n"));
+			poweron_num = 1;
+			ingenic_sdio_wlan_power_onoff(onoff, NORMAL);
+		}
+		break;
+	}
+	return;
 }
+
+
 #endif /* CONFIG_PLATFORM_SPRD */

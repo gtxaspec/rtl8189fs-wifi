@@ -172,7 +172,7 @@ exit:
 	return ret;
 }
 
-static void rtl8188fs_recv_tasklet(void *priv)
+static void rtl8188fs_recv_tasklet(unsigned long priv)
 {
 	_adapter *adapter = (_adapter *)priv;
 	s32 ret;
@@ -188,7 +188,7 @@ static void rtl8188fs_recv_tasklet(void *priv)
 	}
 }
 #else
-static void rtl8188fs_recv_tasklet(void *priv)
+static void rtl8188fs_recv_tasklet(unsigned long priv)
 {
 	PADAPTER				padapter;
 	PHAL_DATA_TYPE			pHalData;
@@ -429,7 +429,7 @@ s32 rtl8188fs_init_recv_priv(PADAPTER padapter)
 	/* 3 2. init tasklet */
 #ifdef PLATFORM_LINUX
 	tasklet_init(&precvpriv->recv_tasklet,
-		     (void(*)(unsigned long))rtl8188fs_recv_tasklet,
+		     rtl8188fs_recv_tasklet,
 		     (unsigned long)padapter);
 #endif
 

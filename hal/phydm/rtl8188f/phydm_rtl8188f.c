@@ -54,7 +54,8 @@ void odm_hw_setting_8188F(struct dm_struct *dm){
 	if (dm->is_R2R_CCA_MASKT_TIME_SHORT)
 		odm_set_bb_reg(dm,0x814,0xffff,0x3110);
 	else
-		odm_set_bb_reg(dm,0x814,0xffff,0x3d10);	
+		odm_set_bb_reg(dm,0x814,0xffff,0x3d10);		
 }
 	
+
 #endif

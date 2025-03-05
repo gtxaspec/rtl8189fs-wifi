@@ -164,7 +164,7 @@ phy_RFSerialRead_8188F(
 {
 	u32						retValue = 0;
 	HAL_DATA_TYPE				*pHalData = GET_HAL_DATA(Adapter);
-	BB_REGISTER_DEFINITION_T	*pPhyReg = &pHalData->PHYRegDef[eRFPath];
+	BB_REGISTER_DEFINITION_T *pPhyReg = &pHalData->PHYRegDef[eRFPath];
 	u32						NewOffset;
 	u32						tmplong, tmplong2;
 	u8					RfPiEnable = 0;
@@ -329,6 +329,10 @@ PHY_QueryRFReg_8188F(
 {
 	u32 Original_Value, Readback_Value, BitShift;
 
+	if (eRFPath >= MAX_RF_PATH)
+		return 0;
+
+
 #if (DISABLE_BB_RF == 1)
 	return 0;
 #endif
@@ -369,6 +373,9 @@ PHY_SetRFReg_8188F(
 )
 {
 	u32		Original_Value, BitShift;
+
+	 if (eRFPath >= MAX_RF_PATH)
+		return;
 
 #if (DISABLE_BB_RF == 1)
 	return;
@@ -1213,8 +1220,8 @@ PHY_HandleSwChnlAndSetBW8188F(
 		BOOLEAN				bSetBandWidth,
 		u8					ChannelNum,
 		enum channel_width	ChnlWidth,
-		EXTCHNL_OFFSET	ExtChnlOffsetOf40MHz,
-		EXTCHNL_OFFSET	ExtChnlOffsetOf80MHz,
+		u8					ExtChnlOffsetOf40MHz,
+		u8					ExtChnlOffsetOf80MHz,
 		u8					CenterFrequencyIndex1
 )
 {

@@ -26,8 +26,8 @@
 #ifndef __PHYDMRAINFO_H__
 #define __PHYDMRAINFO_H__
 
-/* 2019.12.24 Add ra mask c2h & h2c API*/
-#define RAINFO_VERSION "8.6"
+/* 2020.08.05 Fix ARFR bug due to rate_id error for 2.4G VHT mode*/
+#define RAINFO_VERSION "8.8"
 
 #define	FORCED_UPDATE_RAMASK_PERIOD	5
 
@@ -216,7 +216,6 @@ struct ra_table {
 			       struct cmn_sta_info *sta, u64 ra_mask);
 	u8	ra_mask_rpt_stamp;
 	u8 	ra_mask_buf[8];
-	u16	dis_mask_rx_utility_th;
 };
 
 struct ra_mask_rpt_trig {

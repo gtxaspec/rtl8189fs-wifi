@@ -660,13 +660,18 @@ static u32 rtl8188fs_hal_init(PADAPTER padapter)
 		return _SUCCESS;
 	}
 #elif defined(CONFIG_FWLPS_IN_IPS)
-	if (adapter_to_pwrctl(padapter)->bips_processing == _TRUE && psrtpriv->silent_reset_inprogress == _FALSE
-	    && adapter_to_pwrctl(padapter)->pre_ips_type == 0) {
+	if (adapter_to_pwrctl(padapter)->bips_processing == _TRUE &&
+		psrtpriv->silent_reset_inprogress == _FALSE &&
+		adapter_to_pwrctl(padapter)->pre_ips_type == 0 &&
+		rtw_is_fw_ips_mode(padapter) == _TRUE) {
 		systime start_time;
 		u8 cpwm_orig, cpwm_now;
 		u8 val8, bMacPwrCtrlOn = _TRUE;
 
 		RTW_INFO("%s: Leaving IPS in FWLPS state\n", __FUNCTION__);
+#ifdef CONFIG_LPS_LCLK
+		if (rtw_is_fw_ips_lclk_mode(padapter) == _FALSE)
+			goto send_fwips_h2c;
 
 		/* for polling cpwm */
 		cpwm_orig = 0;
@@ -702,17 +707,22 @@ static u32 rtl8188fs_hal_init(PADAPTER padapter)
 			}
 		} while (1);
 
+send_fwips_h2c:
+#endif /* CONFIG_LPS_LCLK */
 		rtl8188f_set_FwPwrModeInIPS_cmd(padapter, 0);
 
 		rtw_hal_set_hwreg(padapter, HW_VAR_APFM_ON_MAC, &bMacPwrCtrlOn);
 
-
+#ifdef CONFIG_LPS_LCLK
 #ifdef DBG_CHECK_FW_PS_STATE
-		if (rtw_fw_ps_state(padapter) == _FAIL) {
-			RTW_INFO("after hal init, fw ps state in 32k\n");
-			pdbgpriv->dbg_ips_drvopen_fail_cnt++;
+		if (rtw_is_fw_ips_lclk_mode(padapter) == _TRUE) {
+			if (rtw_fw_ps_state(padapter) == _FAIL) {
+				RTW_INFO("after hal init, fw ps state in 32k\n");
+				pdbgpriv->dbg_ips_drvopen_fail_cnt++;
+			}
 		}
 #endif /* DBG_CHECK_FW_PS_STATE */
+#endif /* CONFIG_LPS_LCLK */
 		return _SUCCESS;
 	}
 #endif /* CONFIG_SWLPS_IN_IPS */
@@ -1039,7 +1049,9 @@ static u32 rtl8188fs_hal_deinit(PADAPTER padapter)
 			}
 		} else
 #elif defined(CONFIG_FWLPS_IN_IPS)
-		if (adapter_to_pwrctl(padapter)->bips_processing == _TRUE && psrtpriv->silent_reset_inprogress == _FALSE) {
+		if (adapter_to_pwrctl(padapter)->bips_processing == _TRUE &&
+			psrtpriv->silent_reset_inprogress == _FALSE &&
+			rtw_is_fw_ips_mode(padapter) == _TRUE) {
 			if (padapter->netif_up == _TRUE) {
 				int cnt = 0;
 				u8 val8 = 0;
@@ -1047,11 +1059,15 @@ static u32 rtl8188fs_hal_deinit(PADAPTER padapter)
 				RTW_INFO("%s: issue H2C to FW when entering IPS\n", __FUNCTION__);
 
 				rtl8188f_set_FwPwrModeInIPS_cmd(padapter, 0x1);
+#ifdef CONFIG_LPS_LCLK
+				if (rtw_is_fw_ips_lclk_mode(padapter) == _FALSE)
+					return _SUCCESS;
+
 				/* poll 0x1cc to make sure H2C command already finished by FW; MAC_0x1cc=0 means H2C done by FW. */
 				do {
 					val8 = rtw_read8(padapter, REG_HMETFR);
 					cnt++;
-					RTW_INFO("%s  polling REG_HMETFR=0x%x, cnt=%d\n", __FUNCTION__, val8, cnt);
+					RTW_DBG("%s  polling REG_HMETFR=0x%x, cnt=%d\n", __FUNCTION__, val8, cnt);
 					rtw_mdelay_os(10);
 				} while (cnt < 100 && (val8 != 0));
 				/* H2C done, enter 32k */
@@ -1067,7 +1083,7 @@ static u32 rtl8188fs_hal_deinit(PADAPTER padapter)
 					do {
 						val8 = rtw_read8(padapter, REG_CR);
 						cnt++;
-						RTW_INFO("%s  polling 0x100=0x%x, cnt=%d\n", __FUNCTION__, val8, cnt);
+						RTW_DBG("%s  polling 0x100=0x%x, cnt=%d\n", __FUNCTION__, val8, cnt);
 						rtw_mdelay_os(10);
 					} while (cnt < 100 && (val8 != 0xEA));
 #ifdef DBG_CHECK_FW_PS_STATE
@@ -1084,15 +1100,19 @@ static u32 rtl8188fs_hal_deinit(PADAPTER padapter)
 					, rtw_read8(padapter, REG_CR), cnt, rtw_read8(padapter, REG_HMETFR));
 
 				adapter_to_pwrctl(padapter)->pre_ips_type = 0;
-
+#endif /* CONFIG_LPS_LCLK */
 			} else {
 				pdbgpriv->dbg_carddisable_cnt++;
+#ifdef CONFIG_LPS_LCLK
 #ifdef DBG_CHECK_FW_PS_STATE
-				if (rtw_fw_ps_state(padapter) == _FAIL) {
-					RTW_INFO("card disable should leave 32k\n");
-					pdbgpriv->dbg_carddisable_error_cnt++;
+				if (rtw_is_fw_ips_lclk_mode(padapter) == _TRUE) {
+					if (rtw_fw_ps_state(padapter) == _FAIL) {
+						RTW_INFO("card disable should leave 32k\n");
+						pdbgpriv->dbg_carddisable_error_cnt++;
+					}
 				}
 #endif /* DBG_CHECK_FW_PS_STATE */
+#endif /* CONFIG_LPS_LCLK */
 				rtw_hal_power_off(padapter);
 
 				adapter_to_pwrctl(padapter)->pre_ips_type = 1;
@@ -1488,6 +1508,9 @@ void rtl8188fs_set_hal_ops(PADAPTER padapter)
 
 	pHalFunc->hal_xmit = &rtl8188fs_hal_xmit;
 	pHalFunc->mgnt_xmit = &rtl8188fs_mgnt_xmit;
+#ifdef CONFIG_RTW_MGMT_QUEUE
+	pHalFunc->hal_mgmt_xmitframe_enqueue = &rtl8188fs_hal_mgmt_xmitframe_enqueue;
+#endif
 	pHalFunc->hal_xmitframe_enqueue = &rtl8188fs_hal_xmitframe_enqueue;
 
 #ifdef CONFIG_HOSTAPD_MLME

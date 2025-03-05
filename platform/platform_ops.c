@@ -18,9 +18,12 @@
  *	0:	power on successfully
  *	others: power on failed
  */
+extern void rtw_wifi_gpio_wlan_ctrl(int onoff);
+
 int platform_wifi_power_on(void)
 {
 	int ret = 0;
+    rtw_wifi_gpio_wlan_ctrl(1);
 
 
 	return ret;
@@ -28,5 +31,7 @@ int platform_wifi_power_on(void)
 
 void platform_wifi_power_off(void)
 {
+    rtw_wifi_gpio_wlan_ctrl(0);
+
 }
 #endif /* !CONFIG_PLATFORM_OPS */
