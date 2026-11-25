@@ -57,6 +57,13 @@
 #include <linux/vmalloc.h>
 #include <linux/string.h>
 
+/* net_device.dev_addr is const since 5.17 */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0))
+#define rtw_dev_addr_set(ndev, addr)	dev_addr_set((ndev), (addr))
+#else
+#define rtw_dev_addr_set(ndev, addr)	_rtw_memcpy((ndev)->dev_addr, (addr), ETH_ALEN)
+#endif
+
 /* The kernel dropped strlcpy (6.8) and strncpy (7.0) */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0))
 #define strlcpy strscpy
