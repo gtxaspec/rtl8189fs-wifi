@@ -2403,6 +2403,12 @@ ifeq ($(CONFIG_RTL8723B), y)
 $(MODULE_NAME)-$(CONFIG_MP_INCLUDED)+= core/rtw_bt_mp.o
 endif
 
+# Kbuild dropped EXTRA_CFLAGS/EXTRA_LDFLAGS; older trees still read them
+ifeq ($(shell grep -qs EXTRA_CFLAGS $(srctree)/scripts/Makefile.lib && echo y),)
+ccflags-y += $(EXTRA_CFLAGS)
+ldflags-y += $(EXTRA_LDFLAGS)
+endif
+
 obj-$(CONFIG_RTL8189FS) := $(MODULE_NAME).o
 
 else
