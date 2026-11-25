@@ -27,6 +27,22 @@
 #define DBG_RTW_CFG80211_MESH_CONF 0
 #endif
 
+/* cfg80211 passes a wireless_dev to the per-interface ops from 7.1 and a key type enum from 7.4 */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0))
+#define RTW_CFG80211_DEV_PARAM	struct wireless_dev *wdev
+#define RTW_CFG80211_DEV_DECL	struct net_device *ndev = wdev->netdev;
+#else
+#define RTW_CFG80211_DEV_PARAM	struct net_device *ndev
+#define RTW_CFG80211_DEV_DECL
+#endif
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(7, 4, 0))
+#define RTW_CFG80211_PAIRWISE_PARAM	enum nl80211_key_type key_type
+#define RTW_CFG80211_PAIRWISE_DECL	bool pairwise = key_type == NL80211_KEYTYPE_PAIRWISE;
+#else
+#define RTW_CFG80211_PAIRWISE_PARAM	bool pairwise
+#define RTW_CFG80211_PAIRWISE_DECL
+#endif
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0))
 #define STATION_INFO_INACTIVE_TIME	BIT(NL80211_STA_INFO_INACTIVE_TIME)
 #define STATION_INFO_LLID			BIT(NL80211_STA_INFO_LLID)
@@ -1885,13 +1901,20 @@ exit:
 	return ret;
 }
 
-static int cfg80211_rtw_add_key(struct wiphy *wiphy, struct net_device *ndev
+static int cfg80211_rtw_add_key(struct wiphy *wiphy, RTW_CFG80211_DEV_PARAM
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
+	, int link_id
+#endif
 	, u8 key_index
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 37)) || defined(COMPAT_KERNEL_RELEASE)
-	, bool pairwise
+	, RTW_CFG80211_PAIRWISE_PARAM
 #endif
 	, const u8 *mac_addr, struct key_params *params)
 {
+	RTW_CFG80211_DEV_DECL
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 37)) || defined(COMPAT_KERNEL_RELEASE)
+	RTW_CFG80211_PAIRWISE_DECL
+#endif
 	char *alg_name;
 	u32 param_len;
 	struct ieee_param *param = NULL;
@@ -2047,14 +2070,21 @@ addkey_end:
 
 }
 
-static int cfg80211_rtw_get_key(struct wiphy *wiphy, struct net_device *ndev
+static int cfg80211_rtw_get_key(struct wiphy *wiphy, RTW_CFG80211_DEV_PARAM
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
+	, int link_id
+#endif
 	, u8 keyid
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 37)) || defined(COMPAT_KERNEL_RELEASE)
-	, bool pairwise
+	, RTW_CFG80211_PAIRWISE_PARAM
 #endif
 	, const u8 *mac_addr, void *cookie
 	, void (*callback)(void *cookie, struct key_params *))
 {
+	RTW_CFG80211_DEV_DECL
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 37)) || defined(COMPAT_KERNEL_RELEASE)
+	RTW_CFG80211_PAIRWISE_DECL
+#endif
 #define GET_KEY_PARAM_FMT_S " keyid=%d"
 #define GET_KEY_PARAM_ARG_S , keyid
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 37)) || defined(COMPAT_KERNEL_RELEASE)
@@ -2235,13 +2265,17 @@ exit:
 	return ret;
 }
 
-static int cfg80211_rtw_del_key(struct wiphy *wiphy, struct net_device *ndev,
+static int cfg80211_rtw_del_key(struct wiphy *wiphy, RTW_CFG80211_DEV_PARAM,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
+				int link_id,
+#endif
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 37)) || defined(COMPAT_KERNEL_RELEASE)
-				u8 key_index, bool pairwise, const u8 *mac_addr)
+				u8 key_index, RTW_CFG80211_PAIRWISE_PARAM, const u8 *mac_addr)
 #else	/* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 37)) */
 				u8 key_index, const u8 *mac_addr)
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 37)) */
 {
+	RTW_CFG80211_DEV_DECL
 	_adapter *padapter = (_adapter *)rtw_netdev_priv(ndev);
 	struct security_priv *psecuritypriv = &padapter->securitypriv;
 
@@ -2256,7 +2290,11 @@ static int cfg80211_rtw_del_key(struct wiphy *wiphy, struct net_device *ndev,
 }
 
 static int cfg80211_rtw_set_default_key(struct wiphy *wiphy,
-	struct net_device *ndev, u8 key_index
+	struct net_device *ndev,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
+	int link_id,
+#endif
+	u8 key_index
 	#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 38)) || defined(COMPAT_KERNEL_RELEASE)
 	, bool unicast, bool multicast
 	#endif
@@ -2304,8 +2342,13 @@ static int cfg80211_rtw_set_default_key(struct wiphy *wiphy,
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 30))
 int cfg80211_rtw_set_default_mgmt_key(struct wiphy *wiphy,
-	struct net_device *ndev, u8 key_index)
+	RTW_CFG80211_DEV_PARAM,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
+	int link_id,
+#endif
+	u8 key_index)
 {
+	RTW_CFG80211_DEV_DECL
 #define SET_DEF_KEY_PARAM_FMT " key_index=%d"
 #define SET_DEF_KEY_PARAM_ARG , key_index
 
@@ -2450,7 +2493,7 @@ static void rtw_cfg80211_fill_mesh_only_sta_info(struct mesh_plink_ent *plink, s
 #endif /* CONFIG_RTW_MESH */
 
 static int cfg80211_rtw_get_station(struct wiphy *wiphy,
-	struct net_device *ndev,
+	RTW_CFG80211_DEV_PARAM,
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 16, 0))
 	u8 *mac,
 #else
@@ -2458,6 +2501,7 @@ static int cfg80211_rtw_get_station(struct wiphy *wiphy,
 #endif
 	struct station_info *sinfo)
 {
+	RTW_CFG80211_DEV_DECL
 	int ret = 0;
 	_adapter *padapter = (_adapter *)rtw_netdev_priv(ndev);
 	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
